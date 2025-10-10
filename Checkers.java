@@ -3,8 +3,8 @@ import java.awt.*;
 import java.awt.event.*;
 
 /**
- * Basic Checkers with board rendering, initial setup, and basic diagonal movement.
- * @version 0.0.3
+ * Basic Checkers game with rendering, initial setup, movement, and capture mechanics.
+ * @version 0.0.4
  */
 public class Checkers extends JPanel implements MouseListener {
 
@@ -25,7 +25,7 @@ public class Checkers extends JPanel implements MouseListener {
     }
 
     /**
-     * Constructor: initializes the game board and mouse listener.
+     * Constructor: sets up board and mouse events.
      */
     public Checkers() {
         setPreferredSize(new Dimension(SIZE * TILE_SIZE, SIZE * TILE_SIZE));
@@ -34,7 +34,7 @@ public class Checkers extends JPanel implements MouseListener {
     }
 
     /**
-     * Places initial pieces for red (bottom) and black (top) players.
+     * Places initial pieces for red (bottom) and black (top).
      */
     private void initBoard() {
         for (int row = 0; row < SIZE; row++) {
@@ -48,7 +48,7 @@ public class Checkers extends JPanel implements MouseListener {
     }
 
     /**
-     * Renders the board and pieces.
+     * Draws the checkerboard and pieces.
      */
     @Override
     protected void paintComponent(Graphics g) {
@@ -56,7 +56,7 @@ public class Checkers extends JPanel implements MouseListener {
 
         for (int row = 0; row < SIZE; row++) {
             for (int col = 0; col < SIZE; col++) {
-                // Draw checkerboard tiles
+                // Draw board tiles
                 boolean light = (row + col) % 2 == 0;
                 g.setColor(light ? Color.LIGHT_GRAY : Color.DARK_GRAY);
                 g.fillRect(col * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE);
@@ -79,7 +79,7 @@ public class Checkers extends JPanel implements MouseListener {
     }
 
     /**
-     * Handles selecting and moving pieces.
+     * Handles player clicks: selects and moves pieces.
      */
     @Override
     public void mousePressed(MouseEvent e) {
@@ -87,14 +87,14 @@ public class Checkers extends JPanel implements MouseListener {
         int row = e.getY() / TILE_SIZE;
 
         if (selectedRow == -1) {
-            // Select a piece
+            // Select a piece if it belongs to the current player
             Piece p = board[row][col];
             if (p != null && p.isRed == redTurn) {
                 selectedRow = row;
                 selectedCol = col;
             }
         } else {
-            // Attempt to move to clicked location
+            // Try to move to clicked tile
             movePiece(selectedRow, selectedCol, row, col);
             selectedRow = -1;
             selectedCol = -1;
@@ -103,21 +103,35 @@ public class Checkers extends JPanel implements MouseListener {
     }
 
     /**
-     * Performs a simple diagonal move if valid (1 square forward).
+     * Moves or captures pieces if valid.
      */
     private void movePiece(int fromRow, int fromCol, int toRow, int toCol) {
         Piece p = board[fromRow][fromCol];
-        if (p == null) return;
-        if (board[toRow][toCol] != null) return;
+        if (p == null || board[toRow][toCol] != null) return;
 
         int rowDiff = toRow - fromRow;
-        int colDiff = Math.abs(toCol - fromCol);
+        int colDiff = toCol - fromCol;
 
-        // Valid move: 1 diagonal step in allowed direction
-        if (Math.abs(rowDiff) == 1 && colDiff == 1) {
+        // --- BASIC DIAGONAL MOVE (1 square) ---
+        if (Math.abs(rowDiff) == 1 && Math.abs(colDiff) == 1) {
             if ((p.isRed && rowDiff == -1) || (!p.isRed && rowDiff == 1)) {
                 board[toRow][toCol] = p;
                 board[fromRow][fromCol] = null;
+                redTurn = !redTurn;
+            }
+        }
+
+        // --- CAPTURE MOVE (2 squares) ---
+        else if (Math.abs(rowDiff) == 2 && Math.abs(colDiff) == 2) {
+            int midRow = (fromRow + toRow) / 2;
+            int midCol = (fromCol + toCol) / 2;
+            Piece midPiece = board[midRow][midCol];
+
+            // Must be an enemy piece in the middle
+            if (midPiece != null && midPiece.isRed != p.isRed) {
+                board[toRow][toCol] = p;
+                board[fromRow][fromCol] = null;
+                board[midRow][midCol] = null; // remove captured piece
                 redTurn = !redTurn;
             }
         }
@@ -130,7 +144,7 @@ public class Checkers extends JPanel implements MouseListener {
     public void mouseExited(MouseEvent e) {}
 
     /**
-     * Launches the application window.
+     * Entry point: runs the Checkers window.
      */
     public static void main(String[] args) {
         JFrame frame = new JFrame("Basic Checkers");
