@@ -1,6 +1,8 @@
-import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
+import javax.swing.*;
+
+
 
 /**
  * Basic Checkers game with rendering, initial setup, movement, and capture mechanics.
@@ -21,7 +23,10 @@ public class Checkers extends JPanel implements MouseListener {
     static class Piece {
         boolean isRed;
         boolean isKing = false;
-        Piece(boolean isRed) { this.isRed = isRed; }
+
+        Piece(boolean isRed){
+            this.isRed = isRed;
+        }
     }
 
     /**
@@ -95,46 +100,89 @@ public class Checkers extends JPanel implements MouseListener {
             }
         } else {
             // Try to move to clicked tile
-            movePiece(selectedRow, selectedCol, row, col);
+            if (movePiece(selectedRow, selectedCol, row, col)) {
+                redTurn = !redTurn;
+
+            }
             selectedRow = -1;
             selectedCol = -1;
         }
         repaint();
     }
 
+    
+
     /**
      * Moves or captures pieces if valid.
      */
-    private void movePiece(int fromRow, int fromCol, int toRow, int toCol) {
+    private boolean movePiece(int fromRow, int fromCol, int toRow, int toCol) {
         Piece p = board[fromRow][fromCol];
-        if (p == null || board[toRow][toCol] != null) return;
+        if (p == null || board[toRow][toCol] != null) return false;
 
         int rowDiff = toRow - fromRow;
         int colDiff = toCol - fromCol;
-
         // --- BASIC DIAGONAL MOVE (1 square) ---
         if (Math.abs(rowDiff) == 1 && Math.abs(colDiff) == 1) {
             if ((p.isRed && rowDiff == -1) || (!p.isRed && rowDiff == 1)) {
                 board[toRow][toCol] = p;
                 board[fromRow][fromCol] = null;
-                redTurn = !redTurn;
+                return true;
             }
         }
 
         // --- CAPTURE MOVE (2 squares) ---
         else if (Math.abs(rowDiff) == 2 && Math.abs(colDiff) == 2) {
-            int midRow = (fromRow + toRow) / 2;
-            int midCol = (fromCol + toCol) / 2;
-            Piece midPiece = board[midRow][midCol];
+            if ((p.isRed && rowDiff == -2) || (!p.isRed && rowDiff == 2)) {
+                int midRow = (fromRow + toRow) / 2;
+                int midCol = (fromCol + toCol) / 2;
+                Piece midPiece = board[midRow][midCol];
 
-            // Must be an enemy piece in the middle
-            if (midPiece != null && midPiece.isRed != p.isRed) {
-                board[toRow][toCol] = p;
-                board[fromRow][fromCol] = null;
-                board[midRow][midCol] = null; // remove captured piece
-                redTurn = !redTurn;
-            }
+                // Must be an enemy piece in the middle
+                if (midPiece != null && midPiece.isRed != p.isRed) {
+                    board[toRow][toCol] = p;
+                    board[fromRow][fromCol] = null;
+                    board[midRow][midCol] = null; // remove captured piece
+                    return true;
+                }
+            }    
+
         }
+
+        else if (p.isRed && rowDiff < -2) {
+            for (int i = -2; i >= rowDiff; i = i - 2) {
+                if (movePiece(fromRow, fromCol, fromRow - 2,  fromCol + 2)) {
+                    fromRow = fromRow - 2;
+                    fromCol = fromCol + 2; 
+                } else if (movePiece(fromRow, fromCol, fromRow - 2,  fromCol - 2)) {
+                    fromRow = fromRow - 2;
+                    fromCol = fromCol - 2; 
+                }
+                
+       
+            }
+           
+            if (toRow == fromRow) {
+                return true;
+            }
+
+        } else if (!p.isRed && rowDiff > 2) {
+            for (int i = 2; i <= rowDiff; i = i + 2) {
+                if (movePiece(fromRow, fromCol, fromRow + 2,  fromCol + 2)) {
+                    fromRow = fromRow + 2;
+                    fromCol = fromCol + 2; 
+                } else if (movePiece(fromRow, fromCol, fromRow + 2,  fromCol - 2)) {
+                    fromRow = fromRow + 2;
+                    fromCol = fromCol - 2; 
+                }
+       
+            }
+            if (toRow == fromRow) {
+                return true;
+            }
+            
+
+        }
+        return false;
     }
 
     // Unused MouseListener methods
