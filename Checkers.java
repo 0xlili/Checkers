@@ -1,6 +1,8 @@
-import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
+import javax.swing.*;
+
+
 
 /**
  * Basic Checkers game implementing:
@@ -108,24 +110,28 @@ public class Checkers extends JPanel implements MouseListener {
                 selectedCol = col;
             }
         } else {
-            // Attempt to move to the clicked tile
-            movePiece(selectedRow, selectedCol, row, col);
+            // Try to move to clicked tile
+            if (movePiece(selectedRow, selectedCol, row, col)) {
+                redTurn = !redTurn;
+
+            }
             selectedRow = -1;
             selectedCol = -1;
         }
         repaint();
     }
 
+    
+
     /**
      * Handles both normal moves and captures, including king promotion.
      */
-    private void movePiece(int fromRow, int fromCol, int toRow, int toCol) {
+    private boolean movePiece(int fromRow, int fromCol, int toRow, int toCol) {
         Piece p = board[fromRow][fromCol];
-        if (p == null || board[toRow][toCol] != null) return;
+        if (p == null || board[toRow][toCol] != null) return false;
 
         int rowDiff = toRow - fromRow;
         int colDiff = toCol - fromCol;
-
         // --- BASIC DIAGONAL MOVE (1 square) ---
         if (Math.abs(rowDiff) == 1 && Math.abs(colDiff) == 1) {
             if (isValidDirection(p, rowDiff)) {
@@ -137,22 +143,62 @@ public class Checkers extends JPanel implements MouseListener {
 
         // --- CAPTURE MOVE (2 squares) ---
         else if (Math.abs(rowDiff) == 2 && Math.abs(colDiff) == 2) {
-            int midRow = (fromRow + toRow) / 2;
-            int midCol = (fromCol + toCol) / 2;
-            Piece midPiece = board[midRow][midCol];
+            if ((p.isRed && rowDiff == -2) || (!p.isRed && rowDiff == 2)) {
+                int midRow = (fromRow + toRow) / 2;
+                int midCol = (fromCol + toCol) / 2;
+                Piece midPiece = board[midRow][midCol];
 
-            // Capture only if opponent piece in between
-            if (midPiece != null && midPiece.isRed != p.isRed) {
-                board[toRow][toCol] = p;
-                board[fromRow][fromCol] = null;
-                board[midRow][midCol] = null;
-                redTurn = !redTurn;
-            }
+                // Must be an enemy piece in the middle
+                if (midPiece != null && midPiece.isRed != p.isRed) {
+                    board[toRow][toCol] = p;
+                    board[fromRow][fromCol] = null;
+                    board[midRow][midCol] = null; // remove captured piece
+                    return true;
+                }
+            } 
         }
+
+        else if (p.isRed && rowDiff < -2) {
+            for (int i = -2; i >= rowDiff; i = i - 2) {
+                if (movePiece(fromRow, fromCol, fromRow - 2,  fromCol + 2)) {
+                    fromRow = fromRow - 2;
+                    fromCol = fromCol + 2; 
+                } else if (movePiece(fromRow, fromCol, fromRow - 2,  fromCol - 2)) {
+                    fromRow = fromRow - 2;
+                    fromCol = fromCol - 2; 
+                }
+                
+       
+            }
+           
+            if (toRow == fromRow) {
+                return true;
+            }
+
+        } else if (!p.isRed && rowDiff > 2) {
+            for (int i = 2; i <= rowDiff; i = i + 2) {
+                if (movePiece(fromRow, fromCol, fromRow + 2,  fromCol + 2)) {
+                    fromRow = fromRow + 2;
+                    fromCol = fromCol + 2; 
+                } else if (movePiece(fromRow, fromCol, fromRow + 2,  fromCol - 2)) {
+                    fromRow = fromRow + 2;
+                    fromCol = fromCol - 2; 
+                }
+       
+            }
+            if (toRow == fromRow) {
+                return true;
+            }
+            
+
+        }   
+
+        
 
         // --- KING PROMOTION ---
         if (p.isRed && toRow == 0) p.isKing = true;
         if (!p.isRed && toRow == SIZE - 1) p.isKing = true;
+        return false;
     }
 
     /**
