@@ -20,7 +20,8 @@ public class Checkers extends JPanel implements MouseListener {
     private static final int TILE_SIZE = 80;    // Tile size in pixels
 
     private Piece[][] board = new Piece[SIZE][SIZE]; // Game board state
-    private int selectedRow = -1, selectedCol = -1;  // Currently selected piece
+    private int selectedRow = -1;
+    private int selectedCol = -1;  // Currently selected piece
     private boolean redTurn = true;                  // Red always starts
 
     /**
@@ -115,11 +116,54 @@ public class Checkers extends JPanel implements MouseListener {
                 redTurn = !redTurn;
 
             }
-            selectedRow = -1;
-            selectedCol = -1;
+            if (!moveAgain) {
+                selectedRow = -1;
+                selectedCol = -1; 
+            }
+            moveAgain = false;
         }
         repaint();
     }
+
+    private boolean isValidDirection(Piece p, int rowDiff) {
+        return p.isKing || (p.isRed && rowDiff < 0) || (!p.isRed && rowDiff > 0);
+    }
+
+    private void crownIfNeeded(Piece p, int toRow) {
+        if (p.isRed && toRow == 0) {
+            p.isKing = true;
+        }
+        if (!p.isRed && toRow == SIZE - 1) {
+            p.isKing = true;
+        }
+    }
+
+    private boolean isInBounds(int r, int c) {
+        return r >= 0 && r < SIZE && c >= 0 && c < SIZE;
+    }
+
+    private boolean canCaptureAgain(Piece p, int row, int col) {
+        int[] dr = {-2, -2, 2, 2};
+        int[] dc = {-2, 2, -2, 2};
+
+        for (int i = 0; i < 4; i++) {
+            int toRow = row + dr[i];
+            int toCol = col + dc[i];
+            int midRow = row + dr[i] / 2;
+            int midCol = col + dc[i] / 2;
+
+            if (isInBounds(toRow, toCol)) {
+                Piece mid = board[midRow][midCol];
+                if (mid != null && mid.isRed != p.isRed && board[toRow][toCol] == null && isValidDirection(p, dr[i])) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    boolean moveAgain = false;
+
 
     
 
@@ -128,7 +172,9 @@ public class Checkers extends JPanel implements MouseListener {
      */
     private boolean movePiece(int fromRow, int fromCol, int toRow, int toCol) {
         Piece p = board[fromRow][fromCol];
-        if (p == null || board[toRow][toCol] != null) return false;
+        if (p == null || board[toRow][toCol] != null) {
+            return false;
+        }
 
         int rowDiff = toRow - fromRow;
         int colDiff = toCol - fromCol;
@@ -137,77 +183,39 @@ public class Checkers extends JPanel implements MouseListener {
             if (isValidDirection(p, rowDiff)) {
                 board[toRow][toCol] = p;
                 board[fromRow][fromCol] = null;
-                redTurn = !redTurn;
+                crownIfNeeded(p, toRow);
+                return true;
             }
         }
 
         // --- CAPTURE MOVE (2 squares) ---
         else if (Math.abs(rowDiff) == 2 && Math.abs(colDiff) == 2) {
-            if ((p.isRed && rowDiff == -2) || (!p.isRed && rowDiff == 2)) {
-                int midRow = (fromRow + toRow) / 2;
-                int midCol = (fromCol + toCol) / 2;
-                Piece midPiece = board[midRow][midCol];
+            int midRow = (fromRow + toRow) / 2;
+            int midCol = (fromCol + toCol) / 2;
+            Piece midPiece = board[midRow][midCol];
 
-                // Must be an enemy piece in the middle
-                if (midPiece != null && midPiece.isRed != p.isRed) {
-                    board[toRow][toCol] = p;
-                    board[fromRow][fromCol] = null;
-                    board[midRow][midCol] = null; // remove captured piece
-                    return true;
-                }
-            } 
-        }
-
-        else if (p.isRed && rowDiff < -2) {
-            for (int i = -2; i >= rowDiff; i = i - 2) {
-                if (movePiece(fromRow, fromCol, fromRow - 2,  fromCol + 2)) {
-                    fromRow = fromRow - 2;
-                    fromCol = fromCol + 2; 
-                } else if (movePiece(fromRow, fromCol, fromRow - 2,  fromCol - 2)) {
-                    fromRow = fromRow - 2;
-                    fromCol = fromCol - 2; 
+            // Must be an enemy piece in the middle
+            if (midPiece != null && midPiece.isRed != p.isRed && isValidDirection(p, rowDiff)) {
+                board[toRow][toCol] = p;                    
+                board[fromRow][fromCol] = null;
+                board[midRow][midCol] = null; // remove captured piece
+                
+                if (canCaptureAgain(p, toRow, toCol)) {
+                    moveAgain = true;
+                    selectedRow = toRow;
+                    selectedCol = toCol;
+                
                 }
                 
-       
-            }
-           
-            if (toRow == fromRow) {
+                crownIfNeeded(p, toRow);
                 return true;
-            }
-
-        } else if (!p.isRed && rowDiff > 2) {
-            for (int i = 2; i <= rowDiff; i = i + 2) {
-                if (movePiece(fromRow, fromCol, fromRow + 2,  fromCol + 2)) {
-                    fromRow = fromRow + 2;
-                    fromCol = fromCol + 2; 
-                } else if (movePiece(fromRow, fromCol, fromRow + 2,  fromCol - 2)) {
-                    fromRow = fromRow + 2;
-                    fromCol = fromCol - 2; 
-                }
-       
-            }
-            if (toRow == fromRow) {
-                return true;
-            }
-            
-
-        }   
-
-        
-
-        // --- KING PROMOTION ---
-        if (p.isRed && toRow == 0) p.isKing = true;
-        if (!p.isRed && toRow == SIZE - 1) p.isKing = true;
+            }         
+        }
+    
         return false;
     }
 
-    /**
-     * Checks if move direction is valid for the piece (unless kinged).
-     */
-    private boolean isValidDirection(Piece p, int rowDiff) {
-        return p.isKing || (p.isRed && rowDiff == -1) || (!p.isRed && rowDiff == 1);
-    }
-
+  
     // Unused MouseListener methods
     public void mouseReleased(MouseEvent e) {}
     public void mouseClicked(MouseEvent e) {}
