@@ -62,9 +62,9 @@ public class Checkers extends JPanel implements MouseListener {
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
-
         for (int row = 0; row < SIZE; row++) {
             for (int col = 0; col < SIZE; col++) {
+            
 
                 // Draw alternating tiles
                 boolean light = (row + col) % 2 == 0;
@@ -93,6 +93,25 @@ public class Checkers extends JPanel implements MouseListener {
                 }
             }
         }
+        if (endGame()) {
+            g.setColor(new Color(0, 0, 0, 150)); // semi-transparent overlay
+            g.fillRect(0, 0, getWidth(), getHeight());
+
+            g.setColor(Color.WHITE);
+            g.setFont(new Font("Arial", Font.BOLD, 60));
+            FontMetrics fm = g.getFontMetrics();
+            String text = "GAME OVER";
+            int x = (getWidth() - fm.stringWidth(text)) / 2;
+            int y = (getHeight() - fm.getHeight()) / 2 + fm.getAscent() - 30;
+            g.drawString(text, x, y);
+            if (winner != null) {
+                g.setFont(new Font("Arial", Font.BOLD, 40));
+                FontMetrics fm2 = g.getFontMetrics();
+                int wx = (getWidth() - fm2.stringWidth(winner)) / 2;
+                int wy = y + 60;
+                g.drawString(winner, wx, wy);
+            }
+        }
     }
 
     /**
@@ -112,11 +131,9 @@ public class Checkers extends JPanel implements MouseListener {
             }
         } else {
             // Try to move to clicked tile
-            if (movePiece(selectedRow, selectedCol, row, col)) {
-                redTurn = !redTurn;
-
-            }
+            movePiece(selectedRow, selectedCol, row, col);
             if (!moveAgain) {
+                redTurn = !redTurn;
                 selectedRow = -1;
                 selectedCol = -1; 
             }
@@ -215,11 +232,48 @@ public class Checkers extends JPanel implements MouseListener {
         return false;
     }
 
-  
+    private String winner = null;
+
+    /**
+    * Checks if the game has ended and determines the winner.
+    * @return true if the game is over
+    */
+    private boolean endGame() {
+        boolean redPieces = false;
+        boolean blackPieces = false;
+
+        for (int i = 0; i < SIZE; i++) {
+            for (int j = 0; j < SIZE; j++) {
+                Piece p = board[i][j];
+                if (p != null) {
+                    if (p.isRed) {
+                        redPieces = true;
+                    } else {
+                        blackPieces = true;
+                    }
+                }
+            }
+        }
+
+        if (!redPieces && blackPieces) {
+            winner = "Black Wins!";
+            return true;
+        } else if (!blackPieces && redPieces) {
+            winner = "Red Wins!";
+            return true;
+        }
+
+        winner = null; // still playing
+        return false;
+    }
+
     // Unused MouseListener methods
     public void mouseReleased(MouseEvent e) {}
+
     public void mouseClicked(MouseEvent e) {}
+
     public void mouseEntered(MouseEvent e) {}
+
     public void mouseExited(MouseEvent e) {}
 
     /**
