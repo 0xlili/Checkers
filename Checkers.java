@@ -1,8 +1,7 @@
 import java.awt.*;
 import java.awt.event.*;
 import javax.swing.*;
-
-
+import java.util.Stack;
 
 /**
  * Basic Checkers game implementing:
@@ -11,80 +10,107 @@ import javax.swing.*;
  * 3. Basic movement
  * 4. Capturing
  * 5. King promotion
+ * 6. Undo/Redo functionality (buttons + Ctrl+Z/Y)
  *
- * @version 1.0.0
+ * @version 2.1.0
  */
 public class Checkers extends JPanel implements MouseListener {
 
-    private static final int SIZE = 8;          // 8x8 board
-    private static final int TILE_SIZE = 80;    // Tile size in pixels
+    private static final int SIZE = 8;
+    private static final int TILE_SIZE = 80;
 
-    private Piece[][] board = new Piece[SIZE][SIZE]; // Game board state
+    private Piece[][] board = new Piece[SIZE][SIZE];
     private int selectedRow = -1;
-    private int selectedCol = -1;  // Currently selected piece
-    private boolean redTurn = true;                  // Red always starts
+    private int selectedCol = -1;
+    private boolean redTurn = true;
 
-    /**
-     * Represents a checkers piece.
-     */
+    private boolean moveAgain = false;
+    private String winner = null;
+
+    private Stack<Move> undoStack = new Stack<>();
+    private Stack<Move> redoStack = new Stack<>();
+
+    /** Represents a checkers piece. */
     static class Piece {
-        boolean isRed;   // True for red, false for black
-        boolean isKing;  // True if piece has been promoted
+        boolean isRed;
+        boolean isKing;
         Piece(boolean isRed) { this.isRed = isRed; this.isKing = false; }
+        Piece copy() { Piece p = new Piece(this.isRed); p.isKing = this.isKing; return p; }
     }
 
-    /**
-     * Initializes board and listeners.
-     */
+    /** Represents a move for Undo/Redo. */
+    static class Move {
+        int fromRow, fromCol, toRow, toCol;
+        Piece movedPiece, capturedPiece;
+        int capturedRow, capturedCol;
+        boolean becameKing;
+
+        Move(int fr, int fc, int tr, int tc, Piece movedPiece, Piece capturedPiece, int cr, int cc, boolean becameKing) {
+            this.fromRow = fr; this.fromCol = fc;
+            this.toRow = tr; this.toCol = tc;
+            this.movedPiece = movedPiece.copy();
+            this.capturedPiece = (capturedPiece == null) ? null : capturedPiece.copy();
+            this.capturedRow = cr; this.capturedCol = cc;
+            this.becameKing = becameKing;
+        }
+    }
+
     public Checkers() {
         setPreferredSize(new Dimension(SIZE * TILE_SIZE, SIZE * TILE_SIZE));
         addMouseListener(this);
         initBoard();
+        setupKeyBindings();
     }
 
-    /**
-     * Places red and black pieces on starting rows.
-     */
+    /** Initialize pieces in their starting positions. */
     private void initBoard() {
         for (int row = 0; row < SIZE; row++) {
             for (int col = 0; col < SIZE; col++) {
+                board[row][col] = null;
                 if ((row + col) % 2 == 1 && row < 3)
-                    board[row][col] = new Piece(false); // black
+                    board[row][col] = new Piece(false);
                 else if ((row + col) % 2 == 1 && row > 4)
-                    board[row][col] = new Piece(true);  // red
+                    board[row][col] = new Piece(true);
             }
         }
     }
 
-    /**
-     * Draws the checkerboard and all pieces.
-     */
+    /** Sets up Ctrl+Z (Undo) and Ctrl+Y (Redo) shortcuts. */
+    private void setupKeyBindings() {
+        InputMap im = getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW);
+        ActionMap am = getActionMap();
+
+        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_Z, InputEvent.CTRL_DOWN_MASK), "undo");
+        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_Y, InputEvent.CTRL_DOWN_MASK), "redo");
+
+        am.put("undo", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) { undoMove(); }
+        });
+        am.put("redo", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) { redoMove(); }
+        });
+    }
+
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
         for (int row = 0; row < SIZE; row++) {
             for (int col = 0; col < SIZE; col++) {
-            
-
-                // Draw alternating tiles
                 boolean light = (row + col) % 2 == 0;
                 g.setColor(light ? Color.LIGHT_GRAY : Color.DARK_GRAY);
                 g.fillRect(col * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE);
 
-                // Highlight selected piece
                 if (row == selectedRow && col == selectedCol) {
                     g.setColor(new Color(255, 255, 0, 128));
                     g.fillRect(col * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE);
                 }
 
-                // Draw pieces
                 Piece p = board[row][col];
                 if (p != null) {
                     g.setColor(p.isRed ? Color.RED : Color.BLACK);
-                    g.fillOval(col * TILE_SIZE + 10, row * TILE_SIZE + 10,
-                               TILE_SIZE - 20, TILE_SIZE - 20);
-
-                    // Draw crown symbol for kings
+                    g.fillOval(col * TILE_SIZE + 10, row * TILE_SIZE + 10, TILE_SIZE - 20, TILE_SIZE - 20);
                     if (p.isKing) {
                         g.setColor(Color.WHITE);
                         g.setFont(new Font("Arial", Font.BOLD, 18));
@@ -93,8 +119,9 @@ public class Checkers extends JPanel implements MouseListener {
                 }
             }
         }
+
         if (endGame()) {
-            g.setColor(new Color(0, 0, 0, 150)); // semi-transparent overlay
+            g.setColor(new Color(0, 0, 0, 150));
             g.fillRect(0, 0, getWidth(), getHeight());
 
             g.setColor(Color.WHITE);
@@ -114,30 +141,29 @@ public class Checkers extends JPanel implements MouseListener {
         }
     }
 
-    /**
-     * Handles player clicks for selecting and moving pieces.
-     */
     @Override
     public void mousePressed(MouseEvent e) {
         int col = e.getX() / TILE_SIZE;
         int row = e.getY() / TILE_SIZE;
 
         if (selectedRow == -1) {
-            // Select a piece if it belongs to the current player
             Piece p = board[row][col];
             if (p != null && p.isRed == redTurn) {
                 selectedRow = row;
                 selectedCol = col;
             }
         } else {
-            // Try to move to clicked tile
-            movePiece(selectedRow, selectedCol, row, col);
-            if (!moveAgain) {
-                redTurn = !redTurn;
+            if (movePiece(selectedRow, selectedCol, row, col)) {
+                if (!moveAgain) {
+                    redTurn = !redTurn;
+                    selectedRow = -1;
+                    selectedCol = -1;
+                }
+                moveAgain = false;
+            } else {
                 selectedRow = -1;
-                selectedCol = -1; 
+                selectedCol = -1;
             }
-            moveAgain = false;
         }
         repaint();
     }
@@ -147,10 +173,7 @@ public class Checkers extends JPanel implements MouseListener {
     }
 
     private void crownIfNeeded(Piece p, int toRow) {
-        if (p.isRed && toRow == 0) {
-            p.isKing = true;
-        }
-        if (!p.isRed && toRow == SIZE - 1) {
+        if ((p.isRed && toRow == 0) || (!p.isRed && toRow == SIZE - 1)) {
             p.isKing = true;
         }
     }
@@ -179,112 +202,119 @@ public class Checkers extends JPanel implements MouseListener {
         return false;
     }
 
-    boolean moveAgain = false;
-
-
-    
-
-    /**
-     * Handles both normal moves and captures, including king promotion.
-     */
     private boolean movePiece(int fromRow, int fromCol, int toRow, int toCol) {
         Piece p = board[fromRow][fromCol];
-        if (p == null || board[toRow][toCol] != null) {
-            return false;
-        }
+        if (p == null || board[toRow][toCol] != null) return false;
 
         int rowDiff = toRow - fromRow;
         int colDiff = toCol - fromCol;
-        // --- BASIC DIAGONAL MOVE (1 square) ---
+        boolean becameKing = false;
+
         if (Math.abs(rowDiff) == 1 && Math.abs(colDiff) == 1) {
             if (isValidDirection(p, rowDiff)) {
                 board[toRow][toCol] = p;
                 board[fromRow][fromCol] = null;
                 crownIfNeeded(p, toRow);
+                if (p.isKing) becameKing = true;
+                undoStack.push(new Move(fromRow, fromCol, toRow, toCol, p, null, -1, -1, becameKing));
+                redoStack.clear();
                 return true;
             }
-        }
-
-        // --- CAPTURE MOVE (2 squares) ---
-        else if (Math.abs(rowDiff) == 2 && Math.abs(colDiff) == 2) {
+        } else if (Math.abs(rowDiff) == 2 && Math.abs(colDiff) == 2) {
             int midRow = (fromRow + toRow) / 2;
             int midCol = (fromCol + toCol) / 2;
             Piece midPiece = board[midRow][midCol];
-
-            // Must be an enemy piece in the middle
             if (midPiece != null && midPiece.isRed != p.isRed && isValidDirection(p, rowDiff)) {
-                board[toRow][toCol] = p;                    
+                board[toRow][toCol] = p;
                 board[fromRow][fromCol] = null;
-                board[midRow][midCol] = null; // remove captured piece
-                
+                board[midRow][midCol] = null;
+                crownIfNeeded(p, toRow);
+                if (p.isKing) becameKing = true;
+                undoStack.push(new Move(fromRow, fromCol, toRow, toCol, p, midPiece, midRow, midCol, becameKing));
+                redoStack.clear();
+
                 if (canCaptureAgain(p, toRow, toCol)) {
                     moveAgain = true;
                     selectedRow = toRow;
                     selectedCol = toCol;
-                
                 }
-                
-                crownIfNeeded(p, toRow);
                 return true;
-            }         
+            }
         }
-    
         return false;
     }
 
-    private String winner = null;
-
-    /**
-    * Checks if the game has ended and determines the winner.
-    * @return true if the game is over
-    */
     private boolean endGame() {
         boolean redPieces = false;
         boolean blackPieces = false;
-
-        for (int i = 0; i < SIZE; i++) {
+        for (int i = 0; i < SIZE; i++)
             for (int j = 0; j < SIZE; j++) {
                 Piece p = board[i][j];
                 if (p != null) {
-                    if (p.isRed) {
-                        redPieces = true;
-                    } else {
-                        blackPieces = true;
-                    }
+                    if (p.isRed) redPieces = true;
+                    else blackPieces = true;
                 }
             }
-        }
-
-        if (!redPieces && blackPieces) {
-            winner = "Black Wins!";
-            return true;
-        } else if (!blackPieces && redPieces) {
-            winner = "Red Wins!";
-            return true;
-        }
-
-        winner = null; // still playing
+        if (!redPieces && blackPieces) { winner = "Black Wins!"; return true; }
+        else if (!blackPieces && redPieces) { winner = "Red Wins!"; return true; }
+        winner = null;
         return false;
     }
 
-    // Unused MouseListener methods
+    public void undoMove() {
+        if (undoStack.isEmpty()) return;
+        Move m = undoStack.pop();
+        Piece moved = m.movedPiece.copy();
+        board[m.fromRow][m.fromCol] = moved;
+        board[m.toRow][m.toCol] = null;
+        if (m.capturedPiece != null)
+            board[m.capturedRow][m.capturedCol] = m.capturedPiece.copy();
+        moved.isKing = moved.isKing && !m.becameKing;
+        redTurn = !redTurn;
+        redoStack.push(m);
+        repaint();
+    }
+
+    public void redoMove() {
+        if (redoStack.isEmpty()) return;
+        Move m = redoStack.pop();
+        Piece moved = m.movedPiece.copy();
+        board[m.fromRow][m.fromCol] = null;
+        board[m.toRow][m.toCol] = moved;
+        if (m.capturedPiece != null)
+            board[m.capturedRow][m.capturedCol] = null;
+        if (m.becameKing) moved.isKing = true;
+        redTurn = !redTurn;
+        undoStack.push(m);
+        repaint();
+    }
+
     public void mouseReleased(MouseEvent e) {}
-
     public void mouseClicked(MouseEvent e) {}
-
     public void mouseEntered(MouseEvent e) {}
-
     public void mouseExited(MouseEvent e) {}
 
-    /**
-     * Launches the application window.
-     */
+    /** Launch the window. */
     public static void main(String[] args) {
-        JFrame frame = new JFrame("Basic Checkers");
-        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        frame.add(new Checkers());
+        JFrame frame = new JFrame("Checkers with Undo/Redo (Ctrl+Z/Y)");
+        Checkers game = new Checkers();
+
+        JButton undoButton = new JButton("Undo");
+        JButton redoButton = new JButton("Redo");
+
+        undoButton.addActionListener(e -> game.undoMove());
+        redoButton.addActionListener(e -> game.redoMove());
+
+        JPanel controls = new JPanel();
+        controls.add(undoButton);
+        controls.add(redoButton);
+
+        frame.setLayout(new BorderLayout());
+        frame.add(game, BorderLayout.CENTER);
+        frame.add(controls, BorderLayout.SOUTH);
         frame.pack();
         frame.setResizable(false);
+        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.setVisible(true);
     }
 }
