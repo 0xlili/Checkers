@@ -1,6 +1,8 @@
 import java.awt.*;
 import java.awt.event.*;
 import javax.swing.*;
+import javax.sound.sampled.*;
+import java.io.File;
 import java.util.Stack;
 
 /**
@@ -11,8 +13,9 @@ import java.util.Stack;
  * 4. Capturing
  * 5. King promotion
  * 6. Undo/Redo functionality (buttons + Ctrl+Z/Y)
+ * 7. Sound effects
  *
- * @version 2.1.0
+ * @version 2.2.0
  */
 public class Checkers extends JPanel implements MouseListener {
 
@@ -93,6 +96,26 @@ public class Checkers extends JPanel implements MouseListener {
         });
     }
 
+    /** Play sound effect from /sounds folder. */
+    private void playSound(String soundName) {
+        new Thread(() -> {
+            try {
+                // Use getResource to access file inside 'sounds' folder
+                AudioInputStream audioStream = AudioSystem.getAudioInputStream(
+                    getClass().getResource("/sounds/" + soundName + ".wav")
+                );
+                Clip clip = AudioSystem.getClip();
+                clip.open(audioStream);
+                clip.start();
+                clip.addLineListener(e -> {
+                    if (e.getType() == LineEvent.Type.STOP) clip.close();
+                });
+            } catch (Exception e) {
+                System.err.println("Failed to play sound: " + soundName + " (" + e.getMessage() + ")");
+            }
+        }).start();
+    }
+
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
@@ -121,6 +144,7 @@ public class Checkers extends JPanel implements MouseListener {
         }
 
         if (endGame()) {
+            playSound("gameover");
             g.setColor(new Color(0, 0, 0, 150));
             g.fillRect(0, 0, getWidth(), getHeight());
 
@@ -151,6 +175,8 @@ public class Checkers extends JPanel implements MouseListener {
             if (p != null && p.isRed == redTurn) {
                 selectedRow = row;
                 selectedCol = col;
+            } else {
+                playSound("no"); // invalid selection
             }
         } else {
             if (movePiece(selectedRow, selectedCol, row, col)) {
@@ -161,6 +187,7 @@ public class Checkers extends JPanel implements MouseListener {
                 }
                 moveAgain = false;
             } else {
+                playSound("no"); // invalid move
                 selectedRow = -1;
                 selectedCol = -1;
             }
@@ -173,8 +200,12 @@ public class Checkers extends JPanel implements MouseListener {
     }
 
     private void crownIfNeeded(Piece p, int toRow) {
+        boolean wasKing = p.isKing;
         if ((p.isRed && toRow == 0) || (!p.isRed && toRow == SIZE - 1)) {
             p.isKing = true;
+        }
+        if (!wasKing && p.isKing) {
+            playSound("king");
         }
     }
 
@@ -218,6 +249,7 @@ public class Checkers extends JPanel implements MouseListener {
                 if (p.isKing) becameKing = true;
                 undoStack.push(new Move(fromRow, fromCol, toRow, toCol, p, null, -1, -1, becameKing));
                 redoStack.clear();
+                playSound("move");
                 return true;
             }
         } else if (Math.abs(rowDiff) == 2 && Math.abs(colDiff) == 2) {
@@ -232,6 +264,7 @@ public class Checkers extends JPanel implements MouseListener {
                 if (p.isKing) becameKing = true;
                 undoStack.push(new Move(fromRow, fromCol, toRow, toCol, p, midPiece, midRow, midCol, becameKing));
                 redoStack.clear();
+                playSound("capture");
 
                 if (canCaptureAgain(p, toRow, toCol)) {
                     moveAgain = true;
@@ -272,6 +305,7 @@ public class Checkers extends JPanel implements MouseListener {
         moved.isKing = moved.isKing && !m.becameKing;
         redTurn = !redTurn;
         redoStack.push(m);
+        playSound("buzz");
         repaint();
     }
 
@@ -286,6 +320,7 @@ public class Checkers extends JPanel implements MouseListener {
         if (m.becameKing) moved.isKing = true;
         redTurn = !redTurn;
         undoStack.push(m);
+        playSound("buzz");
         repaint();
     }
 
