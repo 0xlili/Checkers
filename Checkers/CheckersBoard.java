@@ -4,7 +4,7 @@ import java.util.Stack;
 
 /**
  * Represents the logical state and rules of a Checkers game.
- * Handles piece movement, captures, king promotion, undo/redo,
+ * Handles piece movement, captures, king promotion, undo/redo/restart,
  * and win detection.
  */
 public class CheckersBoard {
@@ -37,6 +37,16 @@ public class CheckersBoard {
         }
     }
 
+    /** Restart the game with a fresh board. */
+    public void restart() {
+        initBoard();
+        redTurn = true;
+        moveAgain = false;
+        winner = null;
+        undoStack.clear();
+        redoStack.clear();
+    }
+
     /** Represents a checkers piece. */
     static class Piece {
         boolean isRed;
@@ -54,9 +64,9 @@ public class CheckersBoard {
 
         /** Creates a new piece of the given color. */
         Piece copy() { 
-            Piece p = new Piece(this.isRed); 
-            p.isKing = this.isKing; 
-            return p; 
+            Piece piece = new Piece(this.isRed); 
+            piece.isKing = this.isKing; 
+            return piece; 
         }
     }
 
@@ -75,16 +85,16 @@ public class CheckersBoard {
         /**
          * Creates a move record containing all move details.
          */
-        Move(int fr, int fc, int tr, 
-            int tc, Piece movedPiece, Piece capturedPiece, int cr, int cc, boolean becameKing) {
-            this.fromRow = fr; 
-            this.fromCol = fc;
-            this.toRow = tr; 
-            this.toCol = tc;
+        Move(int fromRow, int fromCol, int toRow, int toCol, Piece movedPiece,
+             Piece capturedPiece, int capturedRow, int capturedCol, boolean becameKing) {
+            this.fromRow = fromRow; 
+            this.fromCol = fromCol;
+            this.toRow = toRow; 
+            this.toCol = toCol;
             this.movedPiece = movedPiece.copy();
             this.capturedPiece = (capturedPiece == null) ? null : capturedPiece.copy();
-            this.capturedRow = cr; 
-            this.capturedCol = cc;
+            this.capturedRow = capturedRow; 
+            this.capturedCol = capturedCol;
             this.becameKing = becameKing;
         }
     }
@@ -93,8 +103,8 @@ public class CheckersBoard {
         return p.isKing || (p.isRed && rowDiff < 0) || (!p.isRed && rowDiff > 0);
     }
 
-    private boolean isInBounds(int r, int c) {
-        return r >= 0 && r < SIZE && c >= 0 && c < SIZE;
+    private boolean isInBounds(int row, int col) {
+        return row >= 0 && row < SIZE && col >= 0 && col < SIZE;
     }
 
     private void crownIfNeeded(Piece p, int toRow) {
@@ -227,7 +237,7 @@ public class CheckersBoard {
         moved.isKing = moved.isKing && !m.becameKing;
         redTurn = !redTurn;
         redoStack.push(m);
-        SoundManager.playSound("buzz");
+        SoundManager.playSound("move");
     }
 
     /**
@@ -249,13 +259,9 @@ public class CheckersBoard {
         }
         redTurn = !redTurn;
         undoStack.push(m);
-        SoundManager.playSound("buzz");
+        SoundManager.playSound("move");
     }
 
-    /** Resets the game to its initial state. */
-    public void restart() { 
-        initBoard(); 
-        redTurn = true; 
-    }
+    
 }
 

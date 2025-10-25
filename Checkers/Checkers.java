@@ -10,9 +10,10 @@ import javax.swing.*;
  * 3. Basic movement
  * 4. Capturing
  * 5. King promotion
- * 6. Undo/Redo functionality (buttons + Ctrl+Z/Y)
- * 7. Sound effects
- *
+ * 6. Multicapture
+ * 7. Undo/Redo/Restart functionality (buttons + Ctrl+Z/Y)
+ * 8. Sound effects
+ * 
  * @version 2.2.0
  */
 public class Checkers {
@@ -62,7 +63,9 @@ public class Checkers {
 
         //Add actions
         undoButton.addActionListener(e -> logic.undoMove());
+        undoButton.addActionListener(e -> panel.repaint());
         redoButton.addActionListener(e -> logic.redoMove());
+        redoButton.addActionListener(e -> panel.repaint());
         restartButton.addActionListener(e -> logic.restart());
         restartButton.addActionListener(e -> panel.repaint());
 
