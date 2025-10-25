@@ -309,6 +309,12 @@ public class Checkers extends JPanel implements MouseListener {
         repaint();
     }
 
+    public void restart() {
+        initBoard();
+        redTurn = true;
+        repaint();
+    }
+
     public void redoMove() {
         if (redoStack.isEmpty()) return;
         Move m = redoStack.pop();
@@ -329,21 +335,58 @@ public class Checkers extends JPanel implements MouseListener {
     public void mouseEntered(MouseEvent e) {}
     public void mouseExited(MouseEvent e) {}
 
+
+    
+
     /** Launch the window. */
     public static void main(String[] args) {
         JFrame frame = new JFrame("Checkers with Undo/Redo (Ctrl+Z/Y)");
         Checkers game = new Checkers();
-
         JButton undoButton = new JButton("Undo");
         JButton redoButton = new JButton("Redo");
+        JButton restartButton = new JButton("Restart");
 
-        undoButton.addActionListener(e -> game.undoMove());
-        redoButton.addActionListener(e -> game.redoMove());
+        // === Style buttons ===
+        Color buttonColor = new Color(60, 63, 65);
+        Color hoverColor = new Color(77, 80, 82);
+        Color textColor = Color.WHITE;
+        Font buttonFont = new Font("Segoe UI", Font.BOLD, 14);
 
+        JButton[] buttons = {undoButton, redoButton, restartButton};
+        for (JButton btn : buttons) {
+            btn.setBackground(buttonColor);
+            btn.setForeground(textColor);
+            btn.setFont(buttonFont);
+            btn.setFocusPainted(false);
+            btn.setBorder(BorderFactory.createEmptyBorder(8, 16, 8, 16));
+            
+            // Hover effect
+            btn.addMouseListener(new java.awt.event.MouseAdapter() {
+                public void mouseEntered(java.awt.event.MouseEvent evt) {
+                    btn.setBackground(hoverColor);
+                }
+                public void mouseExited(java.awt.event.MouseEvent evt) {
+                    btn.setBackground(buttonColor);
+                }
+            });
+        }
+
+        // === Create styled control panel ===
         JPanel controls = new JPanel();
+        controls.setBackground(new Color(40, 42, 54));  // dark background
+        controls.setBorder(BorderFactory.createEmptyBorder(10, 0, 10, 0));
+        controls.setLayout(new FlowLayout(FlowLayout.CENTER, 20, 5));
+
         controls.add(undoButton);
         controls.add(redoButton);
+        controls.add(restartButton);
 
+        // === Add actions ===
+        undoButton.addActionListener(e -> game.undoMove());
+        redoButton.addActionListener(e -> game.redoMove());
+        restartButton.addActionListener(e -> game.restart());
+
+        // === Frame setup ===
         frame.setLayout(new BorderLayout());
         frame.add(game, BorderLayout.CENTER);
         frame.add(controls, BorderLayout.SOUTH);
