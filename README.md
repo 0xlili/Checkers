@@ -35,18 +35,18 @@ This project implements the core rules and several advanced features:
 
 ### Directory Structure
 
-Checkers/
-├── Checkers.java
-├── CheckersBoard.java
-├── CheckersPanel.java
-└── SoundManager.java
+- `Checkers/`
+  - `Checkers.java`
+  - `CheckersBoard.java`
+  - `CheckersPanel.java`
+  - `SoundManager.java`
+- `sounds/`
+  - `move.wav`
+  - `capture.wav`
+  - `king.wav`
+  - `gameover.wav`
+  - `no.wav`
 
-sounds/
-├── move.wav
-├── capture.wav
-├── king.wav
-├── gameover.wav
-└── no.wav
 
 
 
